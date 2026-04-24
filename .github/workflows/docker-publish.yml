@@ -4,6 +4,16 @@ on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (without leading v), e.g. 0.0.142'
+        required: true
+        type: string
+      ref:
+        description: 'Commit SHA or branch to build (defaults to main)'
+        required: false
+        type: string
+        default: main
 
 jobs:
   docker:
@@ -13,6 +23,8 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.ref || github.ref }}
 
       - uses: docker/setup-buildx-action@v3
 
@@ -22,11 +34,15 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract version (strip leading v)
+      - name: Resolve version
         id: ver
         run: |
-          REF="${{ github.ref_name }}"
-          VERSION="${REF#v}"
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            REF="${{ github.ref_name }}"
+            VERSION="${REF#v}"
+          fi
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
       - uses: docker/build-push-action@v5
