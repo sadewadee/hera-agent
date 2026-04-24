@@ -1,0 +1,28 @@
+# Example hooks file for ~/.hera/hooks.d/
+#
+# Drop any *.yaml file into ~/.hera/hooks.d/ and the agent picks it up
+# within 5 seconds — no restart needed.
+#
+# Each file is a YAML list of hook definitions.
+# Supported events: before_message, after_message
+# Supported types:  command, http
+#
+# Uncomment and edit to activate.
+
+# - name: log-all-messages
+#   event: after_message
+#   type: command
+#   command: echo "[$HERA_HOOK_PLATFORM] $HERA_HOOK_USER_ID: $HERA_HOOK_TEXT" >> /tmp/hera-messages.log
+
+# - name: notify-webhook
+#   event: after_message
+#   type: http
+#   url: https://example.com/hooks/hera
+
+# - name: profanity-filter
+#   event: before_message
+#   type: command
+#   command: |
+#     if echo "$HERA_HOOK_TEXT" | grep -qi "badword"; then
+#       exit 1
+#     fi

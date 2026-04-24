@@ -1,0 +1,148 @@
+name: Supply Chain Audit
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  scan:
+    name: Scan PR for supply chain risks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan diff for suspicious patterns
+        id: scan
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          BASE="${{ github.event.pull_request.base.sha }}"
+          HEAD="${{ github.event.pull_request.head.sha }}"
+
+          # Get the full diff (added lines only), excluding lock files
+          DIFF=$(git diff "$BASE".."$HEAD" -- . ':!go.sum' ':!package-lock.json' ':!yarn.lock' || true)
+
+          FINDINGS=""
+          CRITICAL=false
+
+          # --- Embedded binaries or suspicious encoded data ---
+          B64_EXEC_HITS=$(echo "$DIFF" | grep -n '^\+' | grep -iE 'base64\.(b64decode|decodebytes)|encoding/base64' | grep -iE 'exec\(|eval\(|os\.Exec|cmd\.Run' | head -10 || true)
+          if [ -n "$B64_EXEC_HITS" ]; then
+            CRITICAL=true
+            FINDINGS="${FINDINGS}
+          ### CRITICAL: base64 decode + exec combo
+          Encoded strings passed to exec/eval to hide payloads.
+
+          **Matches:**
+          \`\`\`
+          ${B64_EXEC_HITS}
+          \`\`\`
+          "
+          fi
+
+          # --- os/exec with encoded/obfuscated commands (Go-specific) ---
+          EXEC_HITS=$(echo "$DIFF" | grep -n '^\+' | grep -E 'exec\.Command\(' | grep -iE 'base64|decode|encode|\\x' | head -10 || true)
+          if [ -n "$EXEC_HITS" ]; then
+            CRITICAL=true
+            FINDINGS="${FINDINGS}
+          ### CRITICAL: exec.Command with encoded arguments
+          Subprocess calls with encoded arguments are a strong indicator of payload execution.
+
+          **Matches:**
+          \`\`\`
+          ${EXEC_HITS}
+          \`\`\`
+          "
+          fi
+
+          # --- Network calls to non-standard domains ---
+          EXFIL_HITS=$(echo "$DIFF" | grep -n '^\+' | grep -iE 'http\.Post\(|http\.NewRequest.*POST|http\.DefaultClient\.Do' | grep -v '^\+\s*//' | grep -v '_test\.go' | head -10 || true)
+          if [ -n "$EXFIL_HITS" ]; then
+            FINDINGS="${FINDINGS}
+          ### WARNING: Outbound HTTP POST calls
+          Outbound POST requests in new code could be data exfiltration. Verify the destination URLs are legitimate.
+
+          **Matches (first 10):**
+          \`\`\`
+          ${EXFIL_HITS}
+          \`\`\`
+          "
+          fi
+
+          # --- CGO or unsafe usage ---
+          UNSAFE_HITS=$(echo "$DIFF" | grep -n '^\+' | grep -E 'import\s+"C"|import\s+"unsafe"' | head -10 || true)
+          if [ -n "$UNSAFE_HITS" ]; then
+            FINDINGS="${FINDINGS}
+          ### WARNING: CGO or unsafe package usage
+          CGO and unsafe bypass Go's memory safety guarantees. Verify the usage is necessary and reviewed.
+
+          **Matches:**
+          \`\`\`
+          ${UNSAFE_HITS}
+          \`\`\`
+          "
+          fi
+
+          # --- go:generate directives ---
+          GENERATE_HITS=$(echo "$DIFF" | grep -n '^\+' | grep -E '//go:generate' | head -10 || true)
+          if [ -n "$GENERATE_HITS" ]; then
+            FINDINGS="${FINDINGS}
+          ### WARNING: go:generate directives added
+          These execute arbitrary commands during \`go generate\`. Verify the commands are safe.
+
+          **Matches:**
+          \`\`\`
+          ${GENERATE_HITS}
+          \`\`\`
+          "
+          fi
+
+          # --- Output results ---
+          if [ -n "$FINDINGS" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            if [ "$CRITICAL" = true ]; then
+              echo "critical=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "critical=false" >> "$GITHUB_OUTPUT"
+            fi
+            echo "$FINDINGS" > /tmp/findings.md
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "critical=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Post warning comment
+        if: steps.scan.outputs.found == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SEVERITY="WARNING: Supply Chain Risk Detected"
+          if [ "${{ steps.scan.outputs.critical }}" = "true" ]; then
+            SEVERITY="CRITICAL: Supply Chain Risk Detected"
+          fi
+
+          BODY="## ${SEVERITY}
+
+          This PR contains patterns commonly associated with supply chain attacks. This does **not** mean the PR is malicious -- but these patterns require careful human review before merging.
+
+          $(cat /tmp/findings.md)
+
+          ---
+          *Automated scan triggered by [supply-chain-audit](/.github/workflows/supply-chain-audit.yml). If this is a false positive, a maintainer can approve after manual review.*"
+
+          gh pr comment "${{ github.event.pull_request.number }}" --body "$BODY"
+
+      - name: Fail on critical findings
+        if: steps.scan.outputs.critical == 'true'
+        run: |
+          echo "::error::CRITICAL supply chain risk patterns detected in this PR. See the PR comment for details."
+          exit 1

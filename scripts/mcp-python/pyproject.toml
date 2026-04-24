@@ -1,0 +1,27 @@
+[project]
+name = "hera-python-mcp"
+version = "0.10.0"
+description = "Python MCP server for Hera — exposes python_exec + registered-tool facilities to the Hera agent"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+    { name = "Hera Project" },
+]
+
+# The MCP SDK is the only runtime dep. Registered tools install their
+# own packages into the venv via python_pip_install at runtime.
+dependencies = [
+    "mcp>=1.0.0",
+]
+
+[project.scripts]
+hera-python-mcp = "hera_python_mcp.__main__:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["hera_python_mcp*"]

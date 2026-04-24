@@ -1,0 +1,79 @@
+# Go binaries and build output
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/bin/
+/dist/
+/hera
+/hera-agent
+/hera-mcp
+/hera-acp
+/hera-batch
+/hera-rl
+/hera-swe
+
+# Go test output
+*.test
+*.out
+coverage.out
+coverage.html
+
+# Go vendor (if not vendoring)
+# /vendor/
+
+# Go workspace
+go.work
+go.work.sum
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# Environment and secrets
+.env
+.env.local
+.env.production
+*.pem
+*.key
+
+# Database files
+*.db
+*.db-wal
+*.db-shm
+data/
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Debug
+__debug_bin*
+*.prof
+
+# Dev squad
+.dev-squad/
+
+# Temporary files
+tmp/
+*.tmp
+*.bak
+*.log
+
+# Python build / test artifacts (scripts/mcp-python)
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+build/
+dist/
+.venv/
+/hera-supervisor

@@ -1,0 +1,16 @@
+[Unit]
+Description=Hera AI Agent Gateway
+After=network.target
+
+[Service]
+Type=simple
+User=hera
+ExecStart=/usr/local/bin/hera gateway start --config /etc/hera/config.yaml
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+Environment=HOME=/var/lib/hera
+
+[Install]
+WantedBy=multi-user.target

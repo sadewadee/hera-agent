@@ -1,0 +1,97 @@
+# syntax=docker/dockerfile:1.7
+#
+# Hera full image — pure Go binary + Python 3.12 + hera-python-mcp.
+# Adds ~150 MB over the slim image but unlocks:
+#   - python_exec for ad-hoc Python snippets
+#   - python_register_tool for persistent Python tools (hot-added by
+#     the LLM, no agent restart)
+#   - python_pip_install for mature-ecosystem dependencies (pandas,
+#     requests, anything on PyPI) scoped into a Hera-managed venv
+#
+# Skills + configs are bundled at /app/bundled and exposed via
+# HERA_BUNDLED. User data (config.yaml, hera.db, synced skills) lives
+# in the /data volume and is populated on first boot by hera init.
+#
+# BuildKit cache mounts keep the Go module cache, Go build cache, apt
+# package cache, and pip wheel cache warm across builds.
+# BuildKit is the default in recent Docker; if you're on an older CLI:
+#   DOCKER_BUILDKIT=1 docker compose -f deployments/docker-compose.full.yml build
+#
+# Stage 1: Build Go binaries (same layering as slim).
+FROM golang:1.26-alpine AS builder
+
+RUN apk add --no-cache git ca-certificates tzdata
+
+WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
+
+COPY . .
+
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /bin/hera ./cmd/hera
+
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /bin/hera-agent ./cmd/hera-agent
+
+# Stage 2: Runtime with Python 3.12 + the MCP server pre-installed.
+# debian-slim over alpine because the mcp SDK and its transitive deps
+# (anyio, pydantic) have better wheel coverage on glibc; alpine would
+# rebuild most of them from source.
+FROM python:3.12-slim-bookworm
+
+# apt cache mount: downloaded .debs come from the BuildKit cache
+# instead of the debian mirrors on rebuilds. Remove docker-clean so
+# apt doesn't purge the cache between runs.
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    rm -f /etc/apt/apt.conf.d/docker-clean \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates tzdata
+
+RUN groupadd --system hera && useradd --system --gid hera --home /home/hera hera
+
+# Copy the Hera binaries.
+COPY --from=builder /bin/hera /usr/local/bin/hera
+COPY --from=builder /bin/hera-agent /usr/local/bin/hera-agent
+
+# Install the Python side in two layers so source edits don't
+# re-download the mcp SDK on every rebuild.
+#
+# Layer A: dependency manifest only. Invalidated only when deps change.
+COPY --from=builder /app/scripts/mcp-python/pyproject.toml /app/scripts/mcp-python/pyproject.toml
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --disable-pip-version-check "mcp>=1.0.0"
+
+# Layer B: the package code. Thin layer — rebuilds often, but the
+# mcp SDK is already in place so pip just installs this package.
+COPY --from=builder /app/scripts/mcp-python /app/scripts/mcp-python
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --disable-pip-version-check --no-deps /app/scripts/mcp-python
+
+# Bundled read-only reference tree: skills + example configs.
+COPY --from=builder /app/skills  /app/bundled/skills
+COPY --from=builder /app/configs /app/bundled/configs
+
+# Copy the entrypoint that runs hera init then exec hera-agent.
+COPY deployments/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+# HERA_BUNDLED: read-only reference tree inside the image.
+ENV HERA_BUNDLED=/app/bundled
+
+# HERA_HOME: user data volume (config, db, synced skills, logs).
+ENV HERA_HOME=/data
+
+RUN mkdir -p /data && chown -R hera:hera /data /app/bundled /app/scripts
+VOLUME /data
+
+USER hera
+
+EXPOSE 8080
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

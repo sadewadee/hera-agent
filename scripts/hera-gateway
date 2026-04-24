@@ -1,0 +1,307 @@
+#!/bin/bash
+# ============================================================================
+# Hera Gateway -- Standalone messaging platform integration.
+#
+# This is the entry point for running the gateway as a service.
+# NOT tied to the CLI -- runs independently.
+#
+# Usage:
+#     # Run in foreground (for testing)
+#     ./scripts/hera-gateway run
+#
+#     # Install as systemd/launchd service
+#     ./scripts/hera-gateway install
+#
+#     # Manage the service
+#     ./scripts/hera-gateway start
+#     ./scripts/hera-gateway stop
+#     ./scripts/hera-gateway restart
+#     ./scripts/hera-gateway status
+#
+#     # Uninstall
+#     ./scripts/hera-gateway uninstall
+# ============================================================================
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+SERVICE_NAME="hera-gateway"
+SERVICE_LABEL="ai.hera.gateway"
+SERVICE_DESCRIPTION="Hera Agent Gateway - Messaging Platform Integration"
+
+HERA_HOME="${HERA_HOME:-$HOME/.hera}"
+LOG_DIR="$HERA_HOME/logs"
+
+# Load .env if it exists
+if [ -f "$PROJECT_DIR/.env" ]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "$PROJECT_DIR/.env"
+    set +a
+fi
+
+# ──────────────────────────────────────────────────────────────────────
+# Platform detection
+# ──────────────────────────────────────────────────────────────────────
+is_linux()  { [[ "$(uname -s)" == "Linux" ]]; }
+is_macos()  { [[ "$(uname -s)" == "Darwin" ]]; }
+
+# ──────────────────────────────────────────────────────────────────────
+# Find hera binary
+# ──────────────────────────────────────────────────────────────────────
+find_hera() {
+    if [ -f "$PROJECT_DIR/hera" ]; then
+        echo "$PROJECT_DIR/hera"
+    elif command -v hera &>/dev/null; then
+        command -v hera
+    else
+        echo ""
+    fi
+}
+
+# ──────────────────────────────────────────────────────────────────────
+# Systemd (Linux)
+# ──────────────────────────────────────────────────────────────────────
+systemd_unit_path() {
+    echo "$HOME/.config/systemd/user/${SERVICE_NAME}.service"
+}
+
+generate_systemd_unit() {
+    local hera_bin
+    hera_bin=$(find_hera)
+    if [ -z "$hera_bin" ]; then
+        echo "ERROR: hera binary not found" >&2
+        exit 1
+    fi
+    cat <<EOF
+[Unit]
+Description=${SERVICE_DESCRIPTION}
+After=network.target
+StartLimitIntervalSec=600
+StartLimitBurst=5
+
+[Service]
+Type=simple
+ExecStart=${hera_bin} gateway
+WorkingDirectory=${PROJECT_DIR}
+Restart=on-failure
+RestartSec=30
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target
+EOF
+}
+
+install_systemd() {
+    local unit_path
+    unit_path=$(systemd_unit_path)
+    mkdir -p "$(dirname "$unit_path")"
+
+    echo "Installing systemd service to: $unit_path"
+    generate_systemd_unit > "$unit_path"
+
+    systemctl --user daemon-reload
+    systemctl --user enable "$SERVICE_NAME"
+
+    echo "[OK] Service installed and enabled"
+    echo ""
+    echo "To start the service:"
+    echo "  systemctl --user start $SERVICE_NAME"
+    echo ""
+    echo "To view logs:"
+    echo "  journalctl --user -u $SERVICE_NAME -f"
+    echo ""
+    echo "To enable lingering (keeps service running after logout):"
+    echo "  sudo loginctl enable-linger \$USER"
+}
+
+uninstall_systemd() {
+    systemctl --user stop "$SERVICE_NAME" 2>/dev/null || true
+    systemctl --user disable "$SERVICE_NAME" 2>/dev/null || true
+
+    local unit_path
+    unit_path=$(systemd_unit_path)
+    if [ -f "$unit_path" ]; then
+        rm "$unit_path"
+        echo "[OK] Removed $unit_path"
+    fi
+
+    systemctl --user daemon-reload
+    echo "[OK] Service uninstalled"
+}
+
+# ──────────────────────────────────────────────────────────────────────
+# Launchd (macOS)
+# ──────────────────────────────────────────────────────────────────────
+launchd_plist_path() {
+    echo "$HOME/Library/LaunchAgents/${SERVICE_LABEL}.plist"
+}
+
+generate_launchd_plist() {
+    local hera_bin
+    hera_bin=$(find_hera)
+    if [ -z "$hera_bin" ]; then
+        echo "ERROR: hera binary not found" >&2
+        exit 1
+    fi
+    mkdir -p "$LOG_DIR"
+    cat <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>${SERVICE_LABEL}</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>${hera_bin}</string>
+        <string>gateway</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>${PROJECT_DIR}</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>${LOG_DIR}/gateway.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>${LOG_DIR}/gateway.error.log</string>
+</dict>
+</plist>
+EOF
+}
+
+install_launchd() {
+    local plist_path
+    plist_path=$(launchd_plist_path)
+    mkdir -p "$(dirname "$plist_path")"
+    mkdir -p "$LOG_DIR"
+
+    echo "Installing launchd service to: $plist_path"
+    generate_launchd_plist > "$plist_path"
+
+    launchctl load "$plist_path"
+
+    echo "[OK] Service installed and loaded"
+    echo ""
+    echo "To view logs:"
+    echo "  tail -f $LOG_DIR/gateway.log"
+    echo ""
+    echo "To manage the service:"
+    echo "  launchctl start $SERVICE_LABEL"
+    echo "  launchctl stop $SERVICE_LABEL"
+}
+
+uninstall_launchd() {
+    local plist_path
+    plist_path=$(launchd_plist_path)
+    launchctl unload "$plist_path" 2>/dev/null || true
+    if [ -f "$plist_path" ]; then
+        rm "$plist_path"
+        echo "[OK] Removed $plist_path"
+    fi
+    echo "[OK] Service uninstalled"
+}
+
+# ──────────────────────────────────────────────────────────────────────
+# Gateway runner
+# ──────────────────────────────────────────────────────────────────────
+run_gateway() {
+    local hera_bin
+    hera_bin=$(find_hera)
+    if [ -z "$hera_bin" ]; then
+        echo "ERROR: hera binary not found."
+        echo "Build it with: go build -o hera ./cmd/hera"
+        exit 1
+    fi
+
+    echo "Starting Hera Gateway..."
+    echo "Press Ctrl+C to stop."
+    echo ""
+    exec "$hera_bin" gateway
+}
+
+# ──────────────────────────────────────────────────────────────────────
+# Dispatch
+# ──────────────────────────────────────────────────────────────────────
+COMMAND="${1:-run}"
+
+case "$COMMAND" in
+    run)
+        run_gateway
+        ;;
+    install)
+        if is_linux; then
+            install_systemd
+        elif is_macos; then
+            install_launchd
+        else
+            echo "Service installation not supported on this platform."
+            echo "Please run manually: ./scripts/hera-gateway run"
+            exit 1
+        fi
+        ;;
+    uninstall)
+        if is_linux; then
+            uninstall_systemd
+        elif is_macos; then
+            uninstall_launchd
+        else
+            echo "Service uninstallation not supported on this platform."
+            exit 1
+        fi
+        ;;
+    start)
+        if is_linux; then
+            systemctl --user start "$SERVICE_NAME"
+            echo "[OK] Service started"
+        elif is_macos; then
+            launchctl start "$SERVICE_LABEL"
+            echo "[OK] Service started"
+        fi
+        ;;
+    stop)
+        if is_linux; then
+            systemctl --user stop "$SERVICE_NAME"
+            echo "[OK] Service stopped"
+        elif is_macos; then
+            launchctl stop "$SERVICE_LABEL"
+            echo "[OK] Service stopped"
+        fi
+        ;;
+    restart)
+        if is_linux; then
+            systemctl --user restart "$SERVICE_NAME"
+            echo "[OK] Service restarted"
+        elif is_macos; then
+            launchctl stop "$SERVICE_LABEL" 2>/dev/null || true
+            launchctl start "$SERVICE_LABEL"
+            echo "[OK] Service restarted"
+        fi
+        ;;
+    status)
+        if is_linux; then
+            systemctl --user status "$SERVICE_NAME"
+        elif is_macos; then
+            launchctl list "$SERVICE_LABEL"
+        fi
+        ;;
+    *)
+        echo "Usage: $0 {run|install|uninstall|start|stop|restart|status}"
+        exit 1
+        ;;
+esac

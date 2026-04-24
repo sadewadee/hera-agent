@@ -1,0 +1,269 @@
+# Hera Configuration
+# Copy this to ~/.hera/config.yaml and customize
+
+agent:
+  default_provider: openai
+  default_model: gpt-4o
+  personality: helpful
+  soul_file: ~/.hera/SOUL.md
+  max_tool_calls: 20
+  memory_nudge_interval: 10
+  skill_nudge_interval: 15
+  smart_routing: true
+  routing:
+    cheap_model: gpt-4o-mini   # model used for simple/short queries
+    capable_model: gpt-4o      # model used for complex/long queries
+    short_threshold_chars: 28  # word count at or below which a query is "simple"
+  compression:
+    enabled: true
+    engine: compressor   # "compressor" (default) or a registered plugin engine
+    threshold: 0.5
+    target_ratio: 0.2
+    protected_turns: 5
+    summary_model: ""  # uses default model if empty
+
+# LLM Providers
+# Configure one or more providers. Set API keys via environment variables or here.
+providers:
+  openai:
+    type: openai
+    api_key: ${OPENAI_API_KEY}
+    models:
+      - gpt-4o
+      - gpt-4o-mini
+      - gpt-4-turbo
+
+  anthropic:
+    type: anthropic
+    api_key: ${ANTHROPIC_API_KEY}
+    models:
+      - claude-sonnet-4-20250514
+      - claude-3-5-haiku-20241022
+      - claude-3-opus-20240229
+
+  gemini:
+    type: gemini
+    api_key: ${GEMINI_API_KEY}
+    models:
+      - gemini-2.0-flash
+      - gemini-2.0-pro
+      - gemini-1.5-pro
+
+  mistral:
+    type: mistral
+    api_key: ${MISTRAL_API_KEY}
+    models:
+      - mistral-large-latest
+      - mistral-medium-latest
+
+  openrouter:
+    type: openrouter
+    api_key: ${OPENROUTER_API_KEY}
+    models:
+      - openai/gpt-4o
+      - anthropic/claude-sonnet-4-20250514
+      - google/gemini-2.0-flash
+
+  ollama:
+    type: ollama
+    # No API key required — Ollama runs locally.
+    # OLLAMA_BASE_URL defaults to http://localhost:11434
+    base_url: ${OLLAMA_BASE_URL:-http://localhost:11434}
+    models:
+      - llama3
+      - codellama
+      - mistral
+
+  # NousResearch — open-weight models via Nous API
+  # nous:
+  #   type: nous
+  #   api_key: ${NOUS_API_KEY}
+  #   models:
+  #     - nous-hermes-2-mixtral-8x7b-dpo
+
+  # HuggingFace Inference API
+  # huggingface:
+  #   type: huggingface
+  #   api_key: ${HUGGINGFACE_API_KEY}
+  #   models:
+  #     - meta-llama/Llama-3-70b-chat-hf
+
+  # GLM (Zhipu AI) — Chinese frontier models
+  # glm:
+  #   type: glm
+  #   api_key: ${GLM_API_KEY}
+  #   models:
+  #     - glm-4
+  #     - glm-4-air
+
+  # Kimi (Moonshot AI)
+  # kimi:
+  #   type: kimi
+  #   api_key: ${MOONSHOT_API_KEY}
+  #   models:
+  #     - moonshot-v1-128k
+  #     - moonshot-v1-32k
+
+  # MiniMax
+  # minimax:
+  #   type: minimax
+  #   api_key: ${MINIMAX_API_KEY}
+  #   models:
+  #     - abab6.5s-chat
+  #     - abab5.5s-chat
+
+  # Example: local OpenAI-compatible endpoint (LM Studio, vLLM, etc.)
+  # local:
+  #   type: compatible
+  #   base_url: http://localhost:11434/v1
+  #   models:
+  #     - llama3
+  #     - codellama
+
+# Memory System
+# provider controls which memory backend Hera uses.
+# "sqlite" (default) — local, no setup required.
+# Plugin providers below augment SQLite with cloud memory — SQLite remains
+# the primary store; the plugin runs as a sidecar.
+#
+# Supported providers:
+#   sqlite        — built-in local store (default)
+#   memory        — alias for sqlite
+#   mem0          — mem0.ai  (requires MEM0_API_KEY)
+#   hindsight     — Hindsight  (requires HINDSIGHT_API_KEY)
+#   holographic   — Holographic Memory  (requires HOLOGRAPHIC_API_KEY)
+#   honcho        — Honcho  (requires HONCHO_API_KEY + HONCHO_APP_ID)
+#   byterover     — ByteRover  (requires BYTEROVER_API_KEY)
+#   openviking    — OpenViking  (requires OPENVIKING_API_KEY)
+#   retaindb      — RetainDB  (requires RETAINDB_API_KEY)
+#   supermemory   — SuperMemory  (requires SUPERMEMORY_API_KEY)
+memory:
+  provider: sqlite
+  db_path: ~/.hera/hera.db
+  max_results: 10
+
+  # Example: use mem0 as a cloud sidecar alongside local SQLite
+  # provider: mem0
+  # (Set MEM0_API_KEY env var)
+
+  # Example: use Honcho
+  # provider: honcho
+  # (Set HONCHO_API_KEY and HONCHO_APP_ID env vars)
+
+# Gateway (Multi-Platform Messaging)
+gateway:
+  session_timeout: 30  # minutes
+  human_delay: true
+  allow_all: false
+  platforms:
+    # --- Wired + smoke-tested ---
+    # telegram:
+    #   enabled: true
+    #   token: ${TELEGRAM_BOT_TOKEN}       # required: TELEGRAM_BOT_TOKEN
+    #   allow_list:
+    #     - "123456789"
+    # discord:
+    #   enabled: true
+    #   token: ${DISCORD_BOT_TOKEN}        # required: DISCORD_BOT_TOKEN
+    # slack:
+    #   enabled: true
+    #   token: ${SLACK_BOT_TOKEN}          # required: SLACK_BOT_TOKEN
+    #   extra:
+    #     app_token: ${SLACK_APP_TOKEN}    # required: SLACK_APP_TOKEN
+
+    # --- Wired (adapter complete, not integration-tested in v0.11.1) ---
+    # whatsapp:
+    #   enabled: true
+    #   token: ${WHATSAPP_ACCESS_TOKEN}    # required: WHATSAPP_ACCESS_TOKEN
+    #   extra:
+    #     phone_number_id: ${WHATSAPP_PHONE_NUMBER_ID}
+    #     verify_token: ${WHATSAPP_VERIFY_TOKEN}
+    #     callback_addr: ":8443"
+    # signal:
+    #   enabled: true
+    #   extra:
+    #     api_url: ${SIGNAL_SERVICE_URL}   # required: signal-cli REST API URL
+    #     phone_number: ${SIGNAL_PHONE_NUMBER}
+    # matrix:
+    #   enabled: true
+    #   token: ${MATRIX_ACCESS_TOKEN}     # required: MATRIX_ACCESS_TOKEN
+    #   extra:
+    #     homeserver_url: ${MATRIX_HOMESERVER_URL}
+    #     user_id: ${MATRIX_USER_ID}
+    # email:
+    #   enabled: true
+    #   extra:
+    #     smtp_host: ${SMTP_HOST}          # required: SMTP_HOST
+    #     smtp_port: "587"
+    #     smtp_user: ${SMTP_USER}
+    #     smtp_password: ${SMTP_PASSWORD}
+    #     from_address: ${EMAIL_FROM}
+    #     webhook_addr: ":8025"
+    # sms:
+    #   enabled: true
+    #   token: ${TWILIO_AUTH_TOKEN}        # required: TWILIO_AUTH_TOKEN
+    #   extra:
+    #     account_sid: ${TWILIO_ACCOUNT_SID}
+    #     from_number: ${TWILIO_FROM_NUMBER}
+    #     webhook_addr: ":8026"
+    # homeassistant:
+    #   enabled: true
+    #   token: ${HA_LONG_LIVED_TOKEN}      # required: HA_LONG_LIVED_TOKEN
+    #   extra:
+    #     ha_url: ${HA_URL}
+    #     webhook_addr: ":8027"
+    # dingtalk:
+    #   enabled: true
+    #   token: ${DINGTALK_ACCESS_TOKEN}    # required: DINGTALK_ACCESS_TOKEN
+    #   extra:
+    #     secret: ${DINGTALK_SECRET}
+    #     callback_addr: ":8028"
+    # feishu:
+    #   enabled: true
+    #   extra:
+    #     app_id: ${FEISHU_APP_ID}         # required: FEISHU_APP_ID
+    #     app_secret: ${FEISHU_APP_SECRET}
+    #     verification_token: ${FEISHU_VERIFY_TOKEN}
+    #     callback_addr: ":8029"
+    # wecom:
+    #   enabled: true
+    #   extra:
+    #     corp_id: ${WECOM_CORP_ID}        # required: WECOM_CORP_ID
+    #     corp_secret: ${WECOM_CORP_SECRET}
+    #     verify_token: ${WECOM_VERIFY_TOKEN}
+    #     callback_addr: ":8030"
+    # mattermost:
+    #   enabled: true
+    #   token: ${MATTERMOST_TOKEN}         # required: MATTERMOST_TOKEN
+    #   extra:
+    #     server_url: ${MATTERMOST_SERVER_URL}
+    # bluebubbles:
+    #   enabled: true
+    #   extra:
+    #     api_url: ${BLUEBUBBLES_API_URL}  # required: BLUEBUBBLES_API_URL
+    #     password: ${BLUEBUBBLES_PASSWORD}
+
+# CLI Settings
+cli:
+  skin: default
+  profile: default
+
+# Cron / Scheduled Tasks
+cron:
+  enabled: false
+
+# Security
+security:
+  redact_pii: false
+  dangerous_approve: true
+  protected_paths:
+    - ~/.ssh
+    - ~/.gnupg
+    - ~/.aws/credentials
+
+# MCP Servers (Model Context Protocol)
+mcp_servers:
+  playwright:
+    command: npx
+    args: ["@executeautomation/playwright-mcp-server"]
+    enabled: true

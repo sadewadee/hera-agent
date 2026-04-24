@@ -1,0 +1,12 @@
+Hera on Termux (Android) - Known Limitations
+
+1. CGO not available - use modernc.org/sqlite (pure Go)
+2. No systemd - use termux-services or manual process management
+3. Limited storage - set HERA_DATA_DIR to accessible path
+4. No Docker - run natively with go build
+5. File paths - use $PREFIX instead of /usr/local
+6. Background execution - use termux-wake-lock to prevent sleep
+7. Notifications - use termux-notification for alerts
+8. Network - may need termux-api for network state detection
+9. Audio - TTS/STT requires termux-api
+10. Process limits - Android may kill background processes

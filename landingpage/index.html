@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hera - Multi-Platform AI Agent</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="hero">
+        <div class="container">
+            <h1>Hera</h1>
+            <p class="tagline">A self-improving, multi-platform AI agent built in Go</p>
+            <div class="cta">
+                <a href="https://github.com/sadewadee/hera" class="btn primary">Get Started</a>
+                <a href="https://github.com/sadewadee/hera/blob/main/README.md" class="btn secondary">Documentation</a>
+            </div>
+        </div>
+    </header>
+    <section class="features">
+        <div class="container">
+            <h2>Features</h2>
+            <div class="grid">
+                <div class="card">
+                    <h3>15+ LLM Providers</h3>
+                    <p>OpenAI, Anthropic, Gemini, Mistral, OpenRouter, Ollama, and more. Switch models with a single config change.</p>
+                </div>
+                <div class="card">
+                    <h3>18 Platforms</h3>
+                    <p>CLI, Telegram, Discord, Slack, WhatsApp, Signal, Matrix, Email, SMS, and more. One agent, everywhere.</p>
+                </div>
+                <div class="card">
+                    <h3>40+ Tools</h3>
+                    <p>File operations, web search, code execution, image generation, voice synthesis, and more built-in.</p>
+                </div>
+                <div class="card">
+                    <h3>Persistent Memory</h3>
+                    <p>SQLite with FTS5 full-text search. Remember conversations, facts, and context across sessions.</p>
+                </div>
+                <div class="card">
+                    <h3>170+ Skills</h3>
+                    <p>DevOps, ML/AI, research, creative, productivity, and more. Plus agent-created skills that grow over time.</p>
+                </div>
+                <div class="card">
+                    <h3>Single Binary</h3>
+                    <p>Built in Go for performance. No runtime dependencies. Deploy anywhere with a single binary or Docker.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+    <section class="quickstart">
+        <div class="container">
+            <h2>Quick Start</h2>
+            <pre><code>$ go install github.com/sadewadee/hera/cmd/hera@latest
+$ export OPENAI_API_KEY=sk-...
+$ hera chat
+> Hello! I'm Hera. How can I help you today?</code></pre>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+        </div>
+    </section>
+    <footer>
+        <div class="container">
+            <p>Hera &mdash; Open Source under MIT License</p>
+            <div class="links">
+                <a href="https://github.com/sadewadee/hera">GitHub</a>
+                <a href="https://github.com/sadewadee/hera/blob/main/README.md">Docs</a>
+                <a href="https://github.com/sadewadee/hera/blob/main/CONTRIBUTING.md">Contribute</a>
+            </div>
+        </div>
+    </footer>
+    <script src="script.js"></script>
+</body>
+</html>

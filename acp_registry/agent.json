@@ -1,0 +1,32 @@
+{
+  "id": "hera-agent",
+  "name": "Hera",
+  "description": "A self-improving, multi-platform AI agent with tools, memory, and skills",
+  "version": "0.1.0",
+  "author": "sadewadee",
+  "protocol": "acp/1.0",
+  "capabilities": {
+    "streaming": true,
+    "tool_use": true,
+    "memory": true,
+    "multi_turn": true,
+    "file_operations": true
+  },
+  "tools": [
+    "web_search", "web_scrape", "file_read", "file_write",
+    "memory_save", "memory_search", "run_command", "datetime",
+    "image_generate", "text_to_speech", "skill_create",
+    "browser", "vision", "terminal", "code_exec", "todo",
+    "delegate", "patch", "debug", "budget"
+  ],
+  "platforms": [
+    "cli", "telegram", "discord", "slack", "whatsapp",
+    "signal", "matrix", "email", "sms", "webhook", "api"
+  ],
+  "endpoints": {
+    "chat": "/v1/chat",
+    "tools": "/v1/tools",
+    "events": "/v1/events",
+    "health": "/health"
+  }
+}

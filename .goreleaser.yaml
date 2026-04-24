@@ -1,0 +1,101 @@
+# .goreleaser.yaml
+# GoReleaser configuration for Hera.
+#
+# Produces:
+#   - Platform binaries (hera, hera-agent) for linux/amd64, linux/arm64, darwin/amd64, darwin/arm64
+#   - Release tarballs with: binary + bundled/skills/ + bundled/configs/
+#   - GitHub Release asset uploaded automatically
+#
+# Usage:
+#   goreleaser release --clean
+#   goreleaser build --snapshot --clean  (local test, no publish)
+version: 2
+
+project_name: hera
+
+before:
+  hooks:
+    - go mod download
+    - go generate ./...
+
+builds:
+  - id: hera
+    main: ./cmd/hera
+    binary: hera
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    ignore:
+      - goos: windows
+        goarch: arm64
+
+  - id: hera-agent
+    main: ./cmd/hera-agent
+    binary: hera-agent
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - id: hera-full
+    name_template: "hera_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    builds:
+      - hera
+      - hera-agent
+    format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    # Include bundled skills and configs alongside the binaries so that
+    # `hera init` can find them at <binary-dir>/../share/hera after install.
+    files:
+      - src: skills/**/*.md
+        dst: bundled/skills
+        strip_parent: true
+      - src: configs/hera.example.yaml
+        dst: bundled/configs
+        strip_parent: true
+      - src: configs/SOUL.md
+        dst: bundled/configs
+        strip_parent: true
+    wrap_in_directory: true
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  version_template: "{{ .Tag }}-next"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - Merge pull request
+      - Merge branch
+
+release:
+  github:
+    owner: sadewadee
+    name: hera
+  draft: false
+  prerelease: auto
+  name_template: "Hera {{.Tag}}"

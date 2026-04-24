@@ -1,0 +1,77 @@
+# Default-deny policy. Only files checked into git are meant to be in
+# the build context; anything local — binaries, databases, caches —
+# should never ship to the Docker daemon.
+
+# Git metadata (7 MB of history, irrelevant to the build).
+.git
+.gitignore
+.gitattributes
+.github
+
+# Pre-built binaries & artefacts. `bin/` is ~100 MB locally.
+bin/
+dist/
+*.exe
+*.dll
+*.so
+*.dylib
+hera
+hera-agent
+hera-mcp
+hera-acp
+hera-swe
+hera-batch
+hera-rl
+
+# Local databases and runtime state.
+*.db
+*.db-wal
+*.db-shm
+data/
+~/                      # guards against the tilde-expansion bug leftover
+
+# Logs.
+*.log
+logs/
+
+# Test coverage / reports.
+*.test
+*.out
+coverage.out
+coverage.html
+
+# Python build artefacts that live under scripts/mcp-python/.
+**/__pycache__/
+**/*.pyc
+**/*.egg-info/
+**/.pytest_cache/
+scripts/mcp-python/build/
+scripts/mcp-python/dist/
+scripts/mcp-python/.venv/
+
+# Editor / OS junk.
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Project-internal scratch.
+.dev-squad/
+RELEASE_*.md            # release notes live in git, not in the image
+
+# Local env files. Containers get config via volume mounts + env vars.
+.env
+.env.local
+.env.production
+.hera/                  # anything auto-created under the repo root
+
+# Website (docs) — large, not runtime.
+website/
+
+# Optional top-level scratch directories.
+tmp/
+*.tmp
+*.bak
